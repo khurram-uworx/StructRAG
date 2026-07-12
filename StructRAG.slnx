@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/sample/">
+    <Project Path="sample/SampleProgram.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/StructRAG/StructRAG.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/StructRAG.Tests/StructRAG.Tests.csproj" />
+  </Folder>
+</Solution>

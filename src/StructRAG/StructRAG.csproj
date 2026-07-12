@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>StructRAG</RootNamespace>
+    <AssemblyName>StructRAG</AssemblyName>
+    <PackageId>StructRAG</PackageId>
+    <Description>A .NET library that enhances RAG answer quality by structuring retrieved documents before reasoning, based on the StructRAG paper (arXiv:2410.08815).</Description>
+    <PackageTags>rag;structrag;ai;llm;vector;search</PackageTags>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="StructRAG.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- AI abstractions — IChatClient, middleware, options -->
+    <PackageReference Include="Microsoft.Extensions.AI" Version="10.*" />
+
+    <!-- Vector store abstractions — user brings their own provider -->
+    <PackageReference Include="Microsoft.Extensions.VectorData.Abstractions" Version="10.*" />
+
+    <!-- Agent Framework — core abstractions -->
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.*" />
+
+    <!-- Agent Framework — workflows for pipeline orchestration -->
+    <PackageReference Include="Microsoft.Agents.AI.Workflows" Version="1.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Embedded prompt templates -->
+    <EmbeddedResource Include="Prompts\StructRAG\*.txt" />
+  </ItemGroup>
+
+</Project>
