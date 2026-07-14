@@ -21,6 +21,9 @@
     <!-- AI abstractions — IChatClient, middleware, options -->
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.*" />
 
+    <!-- Logging abstractions — ILogger, ILoggerFactory, NullLoggerFactory -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.*" />
+
     <!-- Vector store abstractions — user brings their own provider -->
     <PackageReference Include="Microsoft.Extensions.VectorData.Abstractions" Version="10.*" />
 
@@ -29,6 +32,9 @@
 
     <!-- Agent Framework — workflows for pipeline orchestration -->
     <PackageReference Include="Microsoft.Agents.AI.Workflows" Version="1.*" />
+
+    <!-- Resilience — retry with exponential backoff for LLM calls -->
+    <PackageReference Include="Polly" Version="8.*" />
   </ItemGroup>
 
   <ItemGroup>

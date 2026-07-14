@@ -1,5 +1,6 @@
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 using StructRAG.Models;
 
 namespace StructRAG.Stages;
@@ -10,10 +11,12 @@ namespace StructRAG.Stages;
 internal sealed class MergeExecutor : Executor
 {
     readonly IChatClient chatClient;
+    readonly ILogger logger;
 
-    public MergeExecutor(IChatClient chatClient) : base("MergeExecutor")
+    public MergeExecutor(IChatClient chatClient, ILogger logger) : base("MergeExecutor")
     {
         this.chatClient = chatClient;
+        this.logger = logger;
     }
 
     protected override ProtocolBuilder ConfigureProtocol(ProtocolBuilder protocolBuilder)
@@ -33,26 +36,16 @@ internal sealed class MergeExecutor : Executor
             ["subknowledges"] = subKnowledgeText
         });
 
-        var response = await GetCompletionAsync(prompt, subKnowledgeList.Config);
+        var response = await LlmHelper.GetCompletionAsync(chatClient, prompt, subKnowledgeList.Config, logger);
+
+        logger.LogDebug("Merge completed");
 
         return new StructRAGAnswer
         {
             Answer = response,
             Query = subKnowledgeList.Query,
-            StructureType = default,
+            StructureType = subKnowledgeList.StructureType,
             RecordCount = 0
         };
-    }
-
-    private async Task<string> GetCompletionAsync(string prompt, StructRAGConfig config)
-    {
-        var messages = new List<ChatMessage> { new(ChatRole.User, prompt) };
-        var options = new ChatOptions
-        {
-            Temperature = config.Temperature,
-            MaxOutputTokens = config.MaxOutputTokens
-        };
-        var response = await chatClient.GetResponseAsync(messages, options);
-        return response.Text ?? string.Empty;
     }
 }

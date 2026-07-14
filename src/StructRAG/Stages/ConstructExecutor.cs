@@ -1,5 +1,6 @@
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 using StructRAG.Models;
 
 namespace StructRAG.Stages;
@@ -12,10 +13,12 @@ namespace StructRAG.Stages;
 internal sealed class ConstructExecutor : Executor
 {
     readonly IChatClient chatClient;
+    readonly ILogger logger;
 
-    public ConstructExecutor(IChatClient chatClient) : base("ConstructExecutor")
+    public ConstructExecutor(IChatClient chatClient, ILogger logger) : base("ConstructExecutor")
     {
         this.chatClient = chatClient;
+        this.logger = logger;
     }
 
     protected override ProtocolBuilder ConfigureProtocol(ProtocolBuilder protocolBuilder)
@@ -35,11 +38,13 @@ internal sealed class ConstructExecutor : Executor
 
         if (route.StructureType == StructureType.Chunk)
         {
+            logger.LogDebug("Construct: Chunk route — passing raw chunks through");
             return new StructuredKnowledge
             {
                 Instruction = route.Query,
                 Info = chunks,
                 Query = route.Query,
+                StructureType = route.StructureType,
                 Config = route.Config
             };
         }
@@ -54,13 +59,16 @@ internal sealed class ConstructExecutor : Executor
             ["raw_content"] = chunks
         });
 
-        var response = await GetCompletionAsync(prompt, route.Config);
+        var response = await LlmHelper.GetCompletionAsync(chatClient, prompt, route.Config, logger);
+
+        logger.LogDebug("Construct completed for {StructureType}", route.StructureType);
 
         return new StructuredKnowledge
         {
             Instruction = instruction,
             Info = response,
             Query = route.Query,
+            StructureType = route.StructureType,
             Config = route.Config
         };
     }
@@ -73,16 +81,4 @@ internal sealed class ConstructExecutor : Executor
         StructureType.Catalogue => $"Query is {query}, please extract relevant catalogues from the document.",
         _ => throw new InvalidOperationException($"Unexpected structure type for construct: {structureType}")
     };
-
-    private async Task<string> GetCompletionAsync(string prompt, StructRAGConfig config)
-    {
-        var messages = new List<ChatMessage> { new(ChatRole.User, prompt) };
-        var options = new ChatOptions
-        {
-            Temperature = config.Temperature,
-            MaxOutputTokens = config.MaxOutputTokens
-        };
-        var response = await chatClient.GetResponseAsync(messages, options);
-        return response.Text ?? string.Empty;
-    }
 }

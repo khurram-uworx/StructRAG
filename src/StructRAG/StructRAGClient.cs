@@ -1,5 +1,7 @@
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.VectorData;
 using StructRAG.Models;
 using StructRAG.Pipeline;
@@ -17,17 +19,22 @@ public sealed class StructRAGClient
     readonly IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator;
     readonly VectorStoreCollection<string, StructRAGRecord> collection;
     readonly StructRAGConfig config;
+    readonly Workflow workflow;
+    readonly ILogger logger;
 
     public StructRAGClient(
         IChatClient chatClient,
         IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
         VectorStoreCollection<string, StructRAGRecord> collection,
+        ILoggerFactory? loggerFactory = null,
         StructRAGConfig? config = null)
     {
         this.chatClient = chatClient;
         this.embeddingGenerator = embeddingGenerator;
         this.collection = collection;
         this.config = config ?? new StructRAGConfig();
+        this.logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<StructRAGClient>();
+        this.workflow = StructRAGPipeline.Build(chatClient, loggerFactory ?? NullLoggerFactory.Instance);
     }
 
     /// <summary>
@@ -38,12 +45,15 @@ public sealed class StructRAGClient
         double? minRelevance = null,
         CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(question);
+
         var relevance = minRelevance ?? config.MinRelevance;
 
-        var records = await GetSimilarRecordsAsync(question, relevance, cancellationToken);
+        var scored = await GetSimilarRecordsAsync(question, relevance, cancellationToken);
 
-        if (records.Count == 0)
+        if (scored.Count == 0)
         {
+            logger.LogWarning("No records found for query: {Question}", question);
             return new StructRAGAnswer
             {
                 Answer = string.Empty,
@@ -53,7 +63,7 @@ public sealed class StructRAGClient
             };
         }
 
-        var workflow = StructRAGPipeline.Build(chatClient);
+        var records = scored.Select(s => s.Record).ToList();
 
         var input = new QueryContext
         {
@@ -67,6 +77,7 @@ public sealed class StructRAGClient
         var answer = FindOutput<StructRAGAnswer>(run);
         if (answer is null)
         {
+            logger.LogWarning("Workflow returned no output for query: {Question}", question);
             return new StructRAGAnswer
             {
                 Answer = string.Empty,
@@ -76,19 +87,19 @@ public sealed class StructRAGClient
             };
         }
 
-        answer.Citations = BuildCitations(records);
+        answer.Citations = BuildCitations(scored);
         answer.RecordCount = records.Count;
         return answer;
     }
 
-    private async Task<List<StructRAGRecord>> GetSimilarRecordsAsync(
+    private async Task<List<(StructRAGRecord Record, double Score)>> GetSimilarRecordsAsync(
         string query,
         double minRelevance,
         CancellationToken cancellationToken)
     {
         var queryEmbedding = await embeddingGenerator.GenerateVectorAsync(query, cancellationToken: cancellationToken);
 
-        var results = new List<StructRAGRecord>();
+        var results = new List<(StructRAGRecord Record, double Score)>();
 
         await foreach (var result in collection.SearchAsync(
             queryEmbedding,
@@ -96,35 +107,37 @@ public sealed class StructRAGClient
             cancellationToken: cancellationToken))
         {
             if (result.Score is not null && result.Score >= minRelevance)
-                results.Add(result.Record);
+                results.Add((result.Record, result.Score.Value));
         }
 
         return results;
     }
 
-    private static List<Citation> BuildCitations(List<StructRAGRecord> records)
+    private static List<Citation> BuildCitations(List<(StructRAGRecord Record, double Score)> scored)
     {
-        return records
-            .GroupBy(r => r.DocumentId)
+        return scored
+            .GroupBy(s => s.Record.DocumentId)
             .Select(g => new Citation
             {
-                SourceName = g.First().FileName,
-                PartitionText = string.Join("\n\n", g.Select(r => r.PartitionText)),
-                PartitionNumber = g.First().PartitionNumber,
-                SectionNumber = g.First().SectionNumber,
-                Relevance = 0
+                SourceName = g.First().Record.FileName,
+                PartitionText = string.Join("\n\n", g.Select(s => s.Record.PartitionText)),
+                PartitionNumber = g.First().Record.PartitionNumber,
+                SectionNumber = g.First().Record.SectionNumber,
+                Relevance = g.Max(s => s.Score)
             })
             .ToList();
     }
 
     private static T? FindOutput<T>(Run run) where T : class
     {
+        T? last = null;
+
         foreach (var evt in run.NewEvents)
         {
-            if (evt is WorkflowOutputEvent output && output.Data is T typed)
-                return typed;
+            if (evt is ExecutorCompletedEvent completed && completed.Data is T typed)
+                last = typed;
         }
 
-        return null;
+        return last;
     }
 }

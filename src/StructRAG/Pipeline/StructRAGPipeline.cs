@@ -1,5 +1,6 @@
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 using StructRAG.Stages;
 
 namespace StructRAG.Pipeline;
@@ -10,13 +11,13 @@ namespace StructRAG.Pipeline;
 /// </summary>
 internal static class StructRAGPipeline
 {
-    public static Workflow Build(IChatClient chatClient)
+    public static Workflow Build(IChatClient chatClient, ILoggerFactory loggerFactory)
     {
-        var route = new RouteExecutor(chatClient);
-        var construct = new ConstructExecutor(chatClient);
-        var decompose = new DecomposeExecutor(chatClient);
-        var extract = new ExtractExecutor(chatClient);
-        var merge = new MergeExecutor(chatClient);
+        var route = new RouteExecutor(chatClient, loggerFactory.CreateLogger<RouteExecutor>());
+        var construct = new ConstructExecutor(chatClient, loggerFactory.CreateLogger<ConstructExecutor>());
+        var decompose = new DecomposeExecutor(chatClient, loggerFactory.CreateLogger<DecomposeExecutor>());
+        var extract = new ExtractExecutor(chatClient, loggerFactory.CreateLogger<ExtractExecutor>());
+        var merge = new MergeExecutor(chatClient, loggerFactory.CreateLogger<MergeExecutor>());
 
         return new WorkflowBuilder(route)
             .AddEdge(route, construct)

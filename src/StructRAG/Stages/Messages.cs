@@ -39,6 +39,8 @@ public sealed class StructuredKnowledge
 
     public required string Query { get; init; }
 
+    public required StructureType StructureType { get; init; }
+
     public required StructRAGConfig Config { get; init; }
 }
 
@@ -52,6 +54,8 @@ public sealed class SubQueryList
     public required string Info { get; init; }
 
     public required string Query { get; init; }
+
+    public required StructureType StructureType { get; init; }
 
     public required StructRAGConfig Config { get; init; }
 }
@@ -74,6 +78,8 @@ public sealed class SubKnowledgeList
     public required IReadOnlyList<SubKnowledge> Items { get; init; }
 
     public required string Query { get; init; }
+
+    public required StructureType StructureType { get; init; }
 
     public required StructRAGConfig Config { get; init; }
 }

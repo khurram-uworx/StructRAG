@@ -1,5 +1,6 @@
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 using StructRAG.Models;
 
 namespace StructRAG.Stages;
@@ -10,10 +11,12 @@ namespace StructRAG.Stages;
 internal sealed class RouteExecutor : Executor
 {
     readonly IChatClient chatClient;
+    readonly ILogger logger;
 
-    public RouteExecutor(IChatClient chatClient) : base("RouteExecutor")
+    public RouteExecutor(IChatClient chatClient, ILogger logger) : base("RouteExecutor")
     {
         this.chatClient = chatClient;
+        this.logger = logger;
     }
 
     protected override ProtocolBuilder ConfigureProtocol(ProtocolBuilder protocolBuilder)
@@ -34,7 +37,7 @@ internal sealed class RouteExecutor : Executor
             ["titles"] = titles
         });
 
-        var response = await GetCompletionAsync(prompt, context.Config);
+        var response = await LlmHelper.GetCompletionAsync(chatClient, prompt, context.Config, logger);
 
         var structureType = response.Trim().ToLowerInvariant() switch
         {
@@ -43,8 +46,10 @@ internal sealed class RouteExecutor : Executor
             "chunk" => StructureType.Chunk,
             "algorithm" => StructureType.Algorithm,
             "catalogue" => StructureType.Catalogue,
-            _ => throw new InvalidOperationException($"Unknown structure type: '{response.Trim()}'")
+            _ => FallbackRoute(response)
         };
+
+        logger.LogDebug("Route classified as {StructureType}", structureType);
 
         return new RouteResult
         {
@@ -55,15 +60,9 @@ internal sealed class RouteExecutor : Executor
         };
     }
 
-    private async Task<string> GetCompletionAsync(string prompt, StructRAGConfig config)
+    StructureType FallbackRoute(string response)
     {
-        var messages = new List<ChatMessage> { new(ChatRole.User, prompt) };
-        var options = new ChatOptions
-        {
-            Temperature = config.Temperature,
-            MaxOutputTokens = config.MaxOutputTokens
-        };
-        var response = await chatClient.GetResponseAsync(messages, options);
-        return response.Text ?? string.Empty;
+        logger.LogWarning("Unrecognized route response '{Response}' — falling back to Chunk", response.Trim());
+        return StructureType.Chunk;
     }
 }
