@@ -35,7 +35,7 @@ internal sealed class DecomposeExecutor : Executor
         var response = await LlmHelper.GetCompletionAsync(chatClient, prompt, knowledge.Config, logger);
 
         var subQueries = response
-            .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
+            .Split('\n')
             .Select(q => q.Trim())
             .Where(q => q.Length > 0)
             .ToList();
