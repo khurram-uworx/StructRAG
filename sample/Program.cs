@@ -1,8 +1,8 @@
+using CommunityToolkit.VectorData.InMemory;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.VectorData;
-using Microsoft.SemanticKernel.Connectors.InMemory;
 using OpenAI;
 using StructRAG;
 using StructRAG.Extensions;

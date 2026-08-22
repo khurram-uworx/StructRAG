@@ -1,20 +1,22 @@
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
-using StructRAG.Models;
+using Microsoft.Extensions.Logging;
 
 namespace StructRAG.Stages;
 
 /// <summary>
 /// Extract stage: for each sub-query, extracts relevant knowledge from the structured info.
-/// Processes all sub-queries sequentially and returns all results.
+/// Processes sub-queries in parallel with configurable concurrency.
 /// </summary>
 internal sealed class ExtractExecutor : Executor
 {
     readonly IChatClient chatClient;
+    readonly ILogger logger;
 
-    public ExtractExecutor(IChatClient chatClient) : base("ExtractExecutor")
+    public ExtractExecutor(IChatClient chatClient, ILogger logger) : base("ExtractExecutor")
     {
         this.chatClient = chatClient;
+        this.logger = logger;
     }
 
     protected override ProtocolBuilder ConfigureProtocol(ProtocolBuilder protocolBuilder)
@@ -25,37 +27,47 @@ internal sealed class ExtractExecutor : Executor
 
     private async ValueTask<SubKnowledgeList> HandleAsync(SubQueryList subQueries, IWorkflowContext workflowContext)
     {
-        var results = new List<SubKnowledge>();
+        var subQueryArray = subQueries.SubQueries.ToArray();
+        var results = new SubKnowledge[subQueryArray.Length];
+        var maxParallel = subQueries.Config.MaxParallelSubQueries;
+        var semaphore = new SemaphoreSlim(maxParallel);
 
-        foreach (var subQuery in subQueries.SubQueries)
+        var tasks = new Task[subQueryArray.Length];
+        for (var i = 0; i < subQueryArray.Length; i++)
         {
-            var response = await GetCompletionAsync(subQuery, subQueries.Info, subQueries.Config);
-            results.Add(new SubKnowledge
+            var index = i;
+            var subQuery = subQueryArray[i];
+            await semaphore.WaitAsync();
+            tasks[index] = Task.Run(async () =>
             {
-                SubQuery = subQuery,
-                Knowledge = response
+                try
+                {
+                    var instruction = $"Answer the Query based on the given Document.\n\nQuery: {subQuery}\n\nDocument: {subQueries.Info}";
+                    var response = await LlmHelper.GetCompletionAsync(chatClient, instruction, subQueries.Config, logger);
+                    results[index] = new SubKnowledge
+                    {
+                        SubQuery = subQuery,
+                        Knowledge = response
+                    };
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
             });
         }
+
+        await Task.WhenAll(tasks);
+
+        logger.LogDebug("Extracted knowledge for {Count} sub-queries", results.Length);
 
         return new SubKnowledgeList
         {
             Items = results,
             Query = subQueries.Query,
+            StructureType = subQueries.StructureType,
+            RecordCount = subQueries.RecordCount,
             Config = subQueries.Config
         };
-    }
-
-    private async Task<string> GetCompletionAsync(string subQuery, string info, StructRAGConfig config)
-    {
-        var instruction = $"Answer the Query based on the given Document.\n\nQuery: {subQuery}\n\nDocument: {info}";
-
-        var messages = new List<ChatMessage> { new(ChatRole.User, instruction) };
-        var options = new ChatOptions
-        {
-            Temperature = config.Temperature,
-            MaxOutputTokens = config.MaxOutputTokens
-        };
-        var response = await chatClient.GetResponseAsync(messages, options);
-        return response.Text ?? string.Empty;
     }
 }

@@ -21,6 +21,16 @@ public sealed class RouteResult
 {
     public required StructureType StructureType { get; init; }
 
+    /// <summary>
+    /// When non-null, the route was uncertain: the LLM response did not match a known
+    /// structure type, so <see cref="StructureType"/> was set to this fallback value
+    /// (Chunk). Consumers can check this to know the classification was not confident.
+    /// </summary>
+    public StructureType? Fallback { get; init; }
+
+    /// <summary>Number of records retrieved for the query. Threaded through to the answer.</summary>
+    public int RecordCount { get; init; }
+
     public required string Query { get; init; }
 
     public required IReadOnlyList<StructRAGRecord> Records { get; init; }
@@ -39,6 +49,11 @@ public sealed class StructuredKnowledge
 
     public required string Query { get; init; }
 
+    public required StructureType StructureType { get; init; }
+
+    /// <summary>Number of records retrieved for the query. Threaded through to the answer.</summary>
+    public int RecordCount { get; init; }
+
     public required StructRAGConfig Config { get; init; }
 }
 
@@ -52,6 +67,11 @@ public sealed class SubQueryList
     public required string Info { get; init; }
 
     public required string Query { get; init; }
+
+    public required StructureType StructureType { get; init; }
+
+    /// <summary>Number of records retrieved for the query. Threaded through to the answer.</summary>
+    public int RecordCount { get; init; }
 
     public required StructRAGConfig Config { get; init; }
 }
@@ -74,6 +94,11 @@ public sealed class SubKnowledgeList
     public required IReadOnlyList<SubKnowledge> Items { get; init; }
 
     public required string Query { get; init; }
+
+    public required StructureType StructureType { get; init; }
+
+    /// <summary>Number of records retrieved for the query. Carried into the final answer.</summary>
+    public int RecordCount { get; init; }
 
     public required StructRAGConfig Config { get; init; }
 }

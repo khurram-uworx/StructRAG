@@ -79,7 +79,7 @@ Prompts are embedded resources at `Prompts/StructRAG/*.txt`, compiled into the a
 
 Resource naming convention: `StructRAG.Prompts.StructRAG.{name}.txt` (matching the namespace + folder path).
 
-The 7 prompts are copied verbatim from the [original KernelMemory.StructRAG](https://github.com/roji/KernelMemory.StructRAG) — they are LLM-agnostic plain text.
+The 7 prompts are copied verbatim from the [original KernelMemory.StructRAG](https://github.com/kbeaugrand/KernelMemory.StructRAG) — they are LLM-agnostic plain text.
 
 ---
 

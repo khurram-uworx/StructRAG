@@ -11,7 +11,42 @@ namespace StructRAG.Extensions;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Adds StructRAG services to the DI container.
+    /// Adds StructRAG services to the DI container with default configuration.
+    /// The consumer must have already registered:
+    /// - <see cref="IChatClient"/> (via MEAI — OpenAI, Azure OpenAI, Ollama, etc.)
+    /// - <see cref="IEmbeddingGenerator{TInput, TEmbedding}"/> (for query embedding generation)
+    /// - <see cref="VectorStoreCollection{TKey, TRecord}"/> (via MEVD — Qdrant, Azure AI Search, etc.)
+    /// </summary>
+    public static IServiceCollection AddStructRAG(this IServiceCollection services)
+    {
+        services.AddSingleton(new StructRAGConfig());
+        services.AddSingleton<StructRAGClient>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds StructRAG services to the DI container with custom configuration.
+    /// The consumer must have already registered:
+    /// - <see cref="IChatClient"/> (via MEAI — OpenAI, Azure OpenAI, Ollama, etc.)
+    /// - <see cref="IEmbeddingGenerator{TInput, TEmbedding}"/> (for query embedding generation)
+    /// - <see cref="VectorStoreCollection{TKey, TRecord}"/> (via MEVD — Qdrant, Azure AI Search, etc.)
+    /// </summary>
+    public static IServiceCollection AddStructRAG(
+        this IServiceCollection services,
+        Action<StructRAGConfig> configure)
+    {
+        var config = new StructRAGConfig();
+        configure(config);
+
+        services.AddSingleton(config);
+        services.AddSingleton<StructRAGClient>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds StructRAG services to the DI container with options-based configuration.
     /// The consumer must have already registered:
     /// - <see cref="IChatClient"/> (via MEAI — OpenAI, Azure OpenAI, Ollama, etc.)
     /// - <see cref="IEmbeddingGenerator{TInput, TEmbedding}"/> (for query embedding generation)
@@ -32,7 +67,7 @@ public static class ServiceCollectionExtensions
 }
 
 /// <summary>
-/// Configuration options for <see cref="ServiceCollectionExtensions.AddStructRAG"/>.
+/// Configuration options for <see cref="ServiceCollectionExtensions.AddStructRAG(Action{StructRAGOptions})"/>.
 /// </summary>
 public sealed class StructRAGOptions
 {

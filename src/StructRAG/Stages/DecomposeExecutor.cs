@@ -1,6 +1,6 @@
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
-using StructRAG.Models;
+using Microsoft.Extensions.Logging;
 
 namespace StructRAG.Stages;
 
@@ -10,10 +10,12 @@ namespace StructRAG.Stages;
 internal sealed class DecomposeExecutor : Executor
 {
     readonly IChatClient chatClient;
+    readonly ILogger logger;
 
-    public DecomposeExecutor(IChatClient chatClient) : base("DecomposeExecutor")
+    public DecomposeExecutor(IChatClient chatClient, ILogger logger) : base("DecomposeExecutor")
     {
         this.chatClient = chatClient;
+        this.logger = logger;
     }
 
     protected override ProtocolBuilder ConfigureProtocol(ProtocolBuilder protocolBuilder)
@@ -30,10 +32,10 @@ internal sealed class DecomposeExecutor : Executor
             ["kb_info"] = knowledge.Info
         });
 
-        var response = await GetCompletionAsync(prompt, knowledge.Config);
+        var response = await LlmHelper.GetCompletionAsync(chatClient, prompt, knowledge.Config, logger);
 
         var subQueries = response
-            .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
+            .Split('\n')
             .Select(q => q.Trim())
             .Where(q => q.Length > 0)
             .ToList();
@@ -41,24 +43,16 @@ internal sealed class DecomposeExecutor : Executor
         if (subQueries.Count == 0)
             subQueries.Add(knowledge.Instruction);
 
+        logger.LogDebug("Decomposed into {Count} sub-queries", subQueries.Count);
+
         return new SubQueryList
         {
             SubQueries = subQueries,
             Info = knowledge.Info,
             Query = knowledge.Query,
+            StructureType = knowledge.StructureType,
+            RecordCount = knowledge.RecordCount,
             Config = knowledge.Config
         };
-    }
-
-    private async Task<string> GetCompletionAsync(string prompt, StructRAGConfig config)
-    {
-        var messages = new List<ChatMessage> { new(ChatRole.User, prompt) };
-        var options = new ChatOptions
-        {
-            Temperature = config.Temperature,
-            MaxOutputTokens = config.MaxOutputTokens
-        };
-        var response = await chatClient.GetResponseAsync(messages, options);
-        return response.Text ?? string.Empty;
     }
 }

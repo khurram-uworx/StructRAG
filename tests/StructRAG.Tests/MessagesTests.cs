@@ -44,6 +44,7 @@ internal sealed class MessagesTests
             Instruction = "do something",
             Info = "here is info",
             Query = "q",
+            StructureType = StructureType.Chunk,
             Config = new StructRAGConfig()
         };
 
@@ -59,6 +60,7 @@ internal sealed class MessagesTests
             SubQueries = ["sq1", "sq2"],
             Info = "info",
             Query = "q",
+            StructureType = StructureType.Chunk,
             Config = new StructRAGConfig()
         };
 
@@ -90,6 +92,7 @@ internal sealed class MessagesTests
                 new SubKnowledge { SubQuery = "q2", Knowledge = "k2" }
             ],
             Query = "original query",
+            StructureType = StructureType.Chunk,
             Config = new StructRAGConfig()
         };
 
