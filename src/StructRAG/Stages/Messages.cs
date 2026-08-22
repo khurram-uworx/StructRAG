@@ -21,6 +21,13 @@ public sealed class RouteResult
 {
     public required StructureType StructureType { get; init; }
 
+    /// <summary>
+    /// When non-null, the route was uncertain: the LLM response did not match a known
+    /// structure type, so <see cref="StructureType"/> was set to this fallback value
+    /// (Chunk). Consumers can check this to know the classification was not confident.
+    /// </summary>
+    public StructureType? Fallback { get; init; }
+
     public required string Query { get; init; }
 
     public required IReadOnlyList<StructRAGRecord> Records { get; init; }

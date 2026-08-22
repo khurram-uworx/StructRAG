@@ -54,6 +54,9 @@ internal sealed class RouteExecutor : Executor
         return new RouteResult
         {
             StructureType = structureType,
+            Fallback = structureType == StructureType.Chunk && response.Trim().ToLowerInvariant() != "chunk"
+                ? StructureType.Chunk
+                : null,
             Query = context.Query,
             Records = context.Records,
             Config = context.Config
