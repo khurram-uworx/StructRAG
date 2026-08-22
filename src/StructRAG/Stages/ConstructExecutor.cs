@@ -45,6 +45,7 @@ internal sealed class ConstructExecutor : Executor
                 Info = chunks,
                 Query = route.Query,
                 StructureType = route.StructureType,
+                RecordCount = route.RecordCount,
                 Config = route.Config
             };
         }
@@ -69,6 +70,7 @@ internal sealed class ConstructExecutor : Executor
             Info = response,
             Query = route.Query,
             StructureType = route.StructureType,
+            RecordCount = route.RecordCount,
             Config = route.Config
         };
     }

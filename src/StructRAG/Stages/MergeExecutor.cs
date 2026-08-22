@@ -45,7 +45,7 @@ internal sealed class MergeExecutor : Executor
             Answer = response,
             Query = subKnowledgeList.Query,
             StructureType = subKnowledgeList.StructureType,
-            RecordCount = 0
+            RecordCount = subKnowledgeList.RecordCount
         };
     }
 }

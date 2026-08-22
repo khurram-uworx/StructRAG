@@ -57,6 +57,7 @@ internal sealed class RouteExecutor : Executor
             Fallback = structureType == StructureType.Chunk && response.Trim().ToLowerInvariant() != "chunk"
                 ? StructureType.Chunk
                 : null,
+            RecordCount = context.Records.Count,
             Query = context.Query,
             Records = context.Records,
             Config = context.Config

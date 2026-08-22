@@ -28,6 +28,9 @@ public sealed class RouteResult
     /// </summary>
     public StructureType? Fallback { get; init; }
 
+    /// <summary>Number of records retrieved for the query. Threaded through to the answer.</summary>
+    public int RecordCount { get; init; }
+
     public required string Query { get; init; }
 
     public required IReadOnlyList<StructRAGRecord> Records { get; init; }
@@ -48,6 +51,9 @@ public sealed class StructuredKnowledge
 
     public required StructureType StructureType { get; init; }
 
+    /// <summary>Number of records retrieved for the query. Threaded through to the answer.</summary>
+    public int RecordCount { get; init; }
+
     public required StructRAGConfig Config { get; init; }
 }
 
@@ -63,6 +69,9 @@ public sealed class SubQueryList
     public required string Query { get; init; }
 
     public required StructureType StructureType { get; init; }
+
+    /// <summary>Number of records retrieved for the query. Threaded through to the answer.</summary>
+    public int RecordCount { get; init; }
 
     public required StructRAGConfig Config { get; init; }
 }
@@ -87,6 +96,9 @@ public sealed class SubKnowledgeList
     public required string Query { get; init; }
 
     public required StructureType StructureType { get; init; }
+
+    /// <summary>Number of records retrieved for the query. Carried into the final answer.</summary>
+    public int RecordCount { get; init; }
 
     public required StructRAGConfig Config { get; init; }
 }

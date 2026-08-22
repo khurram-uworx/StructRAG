@@ -88,7 +88,6 @@ public sealed class StructRAGClient
         }
 
         answer.Citations = BuildCitations(scored);
-        answer.RecordCount = records.Count;
         return answer;
     }
 

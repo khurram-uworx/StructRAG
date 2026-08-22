@@ -51,6 +51,7 @@ internal sealed class DecomposeExecutor : Executor
             Info = knowledge.Info,
             Query = knowledge.Query,
             StructureType = knowledge.StructureType,
+            RecordCount = knowledge.RecordCount,
             Config = knowledge.Config
         };
     }

@@ -66,6 +66,7 @@ internal sealed class ExtractExecutor : Executor
             Items = results,
             Query = subQueries.Query,
             StructureType = subQueries.StructureType,
+            RecordCount = subQueries.RecordCount,
             Config = subQueries.Config
         };
     }
