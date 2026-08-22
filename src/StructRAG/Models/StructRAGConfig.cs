@@ -13,6 +13,7 @@ public sealed class StructRAGConfig
     int maxOutputTokens = 2048;
     int maxParallelSubQueries = 4;
     int maxRetries = 3;
+    int timeoutSeconds = 60;
 
     /// <summary>Minimum relevance score for vector search results. Must be in [0, 1].</summary>
     public double MinRelevance
@@ -95,6 +96,18 @@ public sealed class StructRAGConfig
             if (value < 0)
                 throw new ArgumentOutOfRangeException(nameof(value), value, "MaxRetries must be non-negative.");
             maxRetries = value;
+        }
+    }
+
+    /// <summary>Per-LLM-call timeout in seconds. A single call that exceeds this is cancelled. Must be greater than zero.</summary>
+    public int TimeoutSeconds
+    {
+        get => timeoutSeconds;
+        set
+        {
+            if (value <= 0)
+                throw new ArgumentOutOfRangeException(nameof(value), value, "TimeoutSeconds must be greater than zero.");
+            timeoutSeconds = value;
         }
     }
 }

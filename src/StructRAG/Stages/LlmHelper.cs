@@ -7,7 +7,8 @@ namespace StructRAG.Stages;
 
 /// <summary>
 /// Shared helper for making LLM completion calls across all pipeline executors.
-/// Includes retry with exponential backoff for transient failures.
+/// Includes retry with exponential backoff for transient failures and a per-call timeout
+/// so a single runaway LLM call cannot hang the pipeline.
 /// </summary>
 internal static class LlmHelper
 {
@@ -15,14 +16,22 @@ internal static class LlmHelper
         IChatClient chatClient,
         string prompt,
         StructRAGConfig config,
-        ILogger? logger = null)
+        ILogger? logger = null,
+        CancellationToken cancellationToken = default)
     {
+        if (chatClient is null)
+            throw new ArgumentNullException(nameof(chatClient));
+
         var messages = new List<ChatMessage> { new(ChatRole.User, prompt) };
         var options = new ChatOptions
         {
             Temperature = config.Temperature,
             MaxOutputTokens = config.MaxOutputTokens
         };
+
+        // Bound the call by a per-call timeout, while still honoring external cancellation.
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(config.TimeoutSeconds));
 
         var retryPolicy = Policy
             .Handle<HttpRequestException>()
@@ -39,10 +48,12 @@ internal static class LlmHelper
                         delay.TotalSeconds);
                 });
 
-        return await retryPolicy.ExecuteAsync(async () =>
+        var result = await retryPolicy.ExecuteAsync(async () =>
         {
-            var response = await chatClient.GetResponseAsync(messages, options);
+            var response = await chatClient.GetResponseAsync(messages, options, timeout.Token).ConfigureAwait(false);
             return response.Text ?? string.Empty;
-        });
+        }).ConfigureAwait(false);
+
+        return result;
     }
 }
