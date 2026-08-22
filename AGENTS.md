@@ -46,6 +46,11 @@ This is the StructRAG project — a .NET 10 library that enhances RAG by structu
 - **Organization:** one test class per source class, `*Tests.cs` suffix; split by behavior when a class is large
 - **Mocking:** prefer real implementations where feasible; use `Substitute.For<T>()` only when external dependencies require it
 
+## GitHub CLI & Shell
+
+- **Write PR/issue bodies to a file** — for `gh pr create` / `gh issue create`, pass the body with `--body-file <path>` rather than inline `--body`. Multi-line strings with quotes and newlines are error-prone in PowerShell (pwsh): the shell's quoting interacts badly with `gh`, and inline bodies frequently get mangled or rejected. Write the body with the `write` tool to a temp path (e.g. the approved temp dir), then reference it.
+- **Quote git ref expressions with `@{}`** — pwsh parses `@{u}` as a hashtable literal and breaks git commands. Always single-quote it: `git rev-parse --abbrev-ref --symbolic-full-name '@{u}'`.
+
 ## Build & Verify
 
 ```bash
