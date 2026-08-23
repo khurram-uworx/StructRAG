@@ -17,6 +17,11 @@ See [README.md](../README.md) for what it is and how to use it.
 | Prompt templating | Embedded resources + `{{$var}}` string replacement | Zero extra dependencies; same approach as the original KernelMemory.StructRAG |
 | Configuration | Constructor parameters + simple POCO | No `IOptions<T>` overhead — this is a library, not an app |
 | Caching / Telemetry | Delegated to user's `IChatClient` middleware | MEAI middleware stack is mature — no reinvention |
+| Substrate persistence | EF Core `IRelationalStore` | Facts/relations are relational; enables server-side traversal + indexes and amortizes LLM extraction |
+| Substrate build strategy | Lazy (check → reuse → build) | No separate ingestion pipeline; amortization is automatic |
+| Substrate tenancy | Single-tenant, fixed `structrag` schema | One deployment covers the whole corpus; `DocumentId` separates corpora logically |
+| Substrate schema mgmt | EF Migrations | Ships an initial migration; `MigrateAsync` on first store use |
+| Substrate providers | Explicit string switch (sqlite/sqlserver/postgresql) | Deterministic, testable; no connection-string sniffing |
 
 ---
 
@@ -33,7 +38,7 @@ Each stage is a MAF `Executor` that receives a typed input message, calls the LL
 | Stage | Executor | Input | Output | What it does |
 |-------|----------|-------|--------|-------------|
 | Route | `RouteExecutor` | `QueryContext` | `RouteResult` | Classifies query into a `StructureType` (Table, Graph, Chunk, Algorithm, Catalogue) |
-| Construct | `ConstructExecutor` | `RouteResult` | `StructuredKnowledge` | Calls the structure-specific prompt (e.g. `ConstructTable.txt`) to extract structured knowledge from the documents |
+| Construct | `ConstructExecutor` | `RouteResult` | `StructuredKnowledge` | Coverage-aware lazy builder: with a relational store and full chunk coverage at the current `ExtractionVersion`, serves a deterministic view from the substrate (no LLM); otherwise extracts via `LazyKnowledgeBuilder`, persists, and renders the view. Without a store, calls the structure-specific prompt per query. |
 | Decompose | `DecomposeExecutor` | `StructuredKnowledge` | `SubQueryList` | Breaks the structured instruction into focused sub-queries |
 | Extract | `ExtractExecutor` | `SubQueryList` | `SubKnowledgeList` | For each sub-query, extracts relevant evidence from the structured info. Processes sequentially (fan-out/fan-in within a single executor). |
 | Merge | `MergeExecutor` | `SubKnowledgeList` | `StructRAGAnswer` | Synthesizes all sub-knowledge into a final answer string |
@@ -52,7 +57,7 @@ Fields like `Query`, `Config`, and `Records` are threaded through every message 
 
 ## Workflow Composition
 
-`StructRAGPipeline.Build(IChatClient)` wires the executors into a linear MAF workflow:
+`StructRAGPipeline.Build(IChatClient, ILoggerFactory, IRelationalStore?)` wires the executors into a linear MAF workflow (the store is optional — `null` keeps the original per-query behavior):
 
 ```csharp
 new WorkflowBuilder(route)
@@ -99,6 +104,39 @@ Default embedding config: 1536 dimensions, cosine similarity. This should be mad
 
 ---
 
+## Knowledge Substrate (optional relational store)
+
+When `AddStructRAGRelationalStore(provider, connectionString)` is registered, `ConstructExecutor`
+becomes a lazy builder that amortizes LLM extraction across queries.
+
+### Coverage & staleness
+On each non-Chunk query, `ConstructExecutor` checks:
+- `SubstrateMetadata` for each involved document has `ExtractionVersion == StructRAGConfig.ExtractionVersion`, and
+- every retrieved chunk key has an `Evidence` row (the per-chunk coverage marker).
+
+If both hold, a deterministic view is rendered from the store with **no LLM call**. Otherwise
+`LazyKnowledgeBuilder` runs the LLM extractor (`ExtractSubstrate.txt` → `KnowledgeExtraction`),
+normalizes the result into substrate records, persists them (replacing the document's rows), and
+records `SubstrateMetadata`. Bump `ExtractionVersion` to force a rebuild when the prompt or model changes.
+
+### Substrate model (`Models/Substrate/`)
+`Entity`, `Fact`, `Event`, `Evidence` (also the per-chunk coverage marker), `Algorithm`,
+`CatalogueItem`, `SubstrateMetadata`. JSON collection columns (`EvidenceChunkKeys`,
+`ParticipantEntityKeys`, `Steps`, `Attributes`) are stored as TEXT via a `ValueConverter`.
+
+### Store (`Store/`)
+- `IRelationalStore` — upsert/get surface (document-scoped upsert is idempotent).
+- `EfRelationalStore` — EF Core implementation; creates a `StructRAGDbContext` per operation
+  from `IDbContextFactory` and applies the migration on first use.
+- `StructRAGDbContext` — single fixed `structrag` schema; `IDesignTimeDbContextFactory` enables
+  `dotnet ef migrations`.
+- `RelationalStoreServiceCollectionExtensions.AddStructRAGRelationalStore` — provider switch.
+
+### View rendering (`Stages/SubstrateViewBuilder`)
+Renders the persisted substrate into the graph / table / algorithm / catalogue text the
+downstream `Decompose`/`Extract` stages consume — so once built, only `Decompose`/`Extract`/
+`Merge` still call the LLM.
+
 ## Public API
 
 The single entry point is `StructRAGClient`, resolved from DI. Its `AskAsync` method:
@@ -116,23 +154,38 @@ The single entry point is `StructRAGClient`, resolved from DI. Its `AskAsync` me
 
 ```
 src/StructRAG/
-├── StructRAG.csproj                          # net10.0, MEAI + MEVD + MAF
-├── StructRAGClient.cs                        # Public API entry point
+├── StructRAG.csproj                          # net10.0, MEAI + MEVD + MAF + EF Core
+├── StructRAGClient.cs                        # Public API entry point (optional IRelationalStore)
 ├── Models/
 │   ├── StructRAGRecord.cs                    # MEVD record type
 │   ├── StructRAGAnswer.cs                    # Answer model
 │   ├── Citation.cs                           # Citation model
-│   ├── StructRAGConfig.cs                    # Configuration POCO
-│   └── StructureType.cs                      # Enum: Table, Graph, Chunk, Algorithm, Catalogue
+│   ├── StructRAGConfig.cs                    # Configuration POCO (incl. ExtractionVersion)
+│   ├── StructureType.cs                      # Enum: Table, Graph, Chunk, Algorithm, Catalogue
+│   └── Substrate/                            # EF Core substrate entities (Entity/Fact/Event/Evidence/Algorithm/CatalogueItem/SubstrateMetadata)
 ├── Prompts/StructRAG/                        # Embedded prompt templates (copied from original)
+│   └── ExtractSubstrate.txt                  # LLM → KnowledgeExtraction DTO (substrate build)
 ├── Workflow/
 │   ├── RouteExecutor.cs                      # Stage 1: classify query
-│   ├── ConstructExecutor.cs                  # Stage 2: extract structured knowledge
+│   ├── ConstructExecutor.cs                  # Stage 2: coverage-aware lazy builder (optional store)
 │   ├── DecomposeExecutor.cs                  # Stage 3: break into sub-queries
 │   ├── ExtractExecutor.cs                    # Stage 4: extract evidence per sub-query
 │   ├── MergeExecutor.cs                      # Stage 5: synthesize final answer
 │   ├── Messages.cs                           # All message types between stages
 │   └── PromptLoader.cs                       # Embedded resource loader + {{$var}} substitution
+├── Stages/
+│   ├── LlmHelper.cs                          # GetStructuredAsync<T> (native schema + text-JSON fallback)
+│   └── SubstrateViewBuilder.cs               # Render persisted substrate into stage inputs
+├── Ingestion/
+│   ├── KnowledgeExtraction.cs                # Extraction DTO (normalized from LLM JSON)
+│   └── LazyKnowledgeBuilder.cs               # Extract → normalize → persist → version
+├── Store/
+│   ├── StructRAGDbContext.cs                 # Single fixed `structrag` schema
+│   ├── StructRAGDbContextFactory.cs          # IDesignTimeDbContextFactory (dotnet ef)
+│   ├── IRelationalStore.cs                   # Store contract (document-scoped)
+│   ├── EfRelationalStore.cs                  # EF Core implementation (migrate on first use)
+│   ├── RelationalStoreServiceCollectionExtensions.cs  # AddStructRAGRelationalStore(provider, connectionString)
+│   └── Migrations/                           # InitialSubstrate (provider-agnostic)
 ├── Pipeline/
 │   └── StructRAGPipeline.cs                  # MAF workflow composition
 └── Extensions/
@@ -153,8 +206,10 @@ sample/
 | `Microsoft.Extensions.VectorData.Abstractions` | 10.* | `VectorStoreCollection<TKey, TRecord>`, `VectorStore`, search abstractions |
 | `Microsoft.Agents.AI` | 1.* | Core Agent Framework abstractions |
 | `Microsoft.Agents.AI.Workflows` | 1.* | `Executor`, `WorkflowBuilder`, `InProcessExecution` — pipeline orchestration |
+| `Microsoft.EntityFrameworkCore` (+ `.Relational` / `.Sqlite` / `.SqlServer`) | 10.0.11 | Relational substrate store (`IRelationalStore`) |
+| `Npgsql.EntityFrameworkCore.PostgreSQL` | 10.0.3 | PostgreSQL provider for the substrate |
 
-The consumer is responsible for providing their own `IChatClient`, `IEmbeddingGenerator`, and `VectorStoreCollection` implementations via DI.
+The consumer is responsible for providing their own `IChatClient`, `IEmbeddingGenerator`, and `VectorStoreCollection` implementations via DI. The relational substrate is **optional**: register `AddStructRAGRelationalStore(provider, connectionString)` to enable it (SQLite/SQL Server/PostgreSQL).
 
 ---
 
