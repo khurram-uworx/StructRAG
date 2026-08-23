@@ -50,7 +50,7 @@ This is the StructRAG project — a .NET 10 library that enhances RAG by structu
 
 ## GitHub CLI & Shell
 
-- **Write PR/issue bodies to a file** — for `gh pr create` / `gh issue create`, pass the body with `--body-file <path>` rather than inline `--body`. Multi-line strings with quotes and newlines are error-prone in PowerShell (pwsh): the shell's quoting interacts badly with `gh`, and inline bodies frequently get mangled or rejected. Write the body with the `write` tool to a temp path (e.g. the approved temp dir), then reference it.
+- **Always write PR/issue bodies to a file — never inline.** For `gh pr create` / `gh issue create`, write the body to a temp file with the `write` tool (e.g. the approved temp dir), then pass it with `--body-file <path>`. Never use inline `--body "..."`. Multi-line bodies with quotes and newlines are error-prone in PowerShell (pwsh): the shell's quoting interacts badly with `gh`, and inline bodies frequently get mangled or rejected. PR titles may stay inline, but the body must come from a file.
 - **Quote git ref expressions with `@{}`** — pwsh parses `@{u}` as a hashtable literal and breaks git commands. Always single-quote it: `git rev-parse --abbrev-ref --symbolic-full-name '@{u}'`.
 
 ## Build & Verify
