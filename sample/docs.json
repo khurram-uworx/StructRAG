@@ -1,0 +1,27 @@
+[
+  {
+    "docId": "doc-1",
+    "fileName": "intro.txt",
+    "text": "StructRAG is a retrieval-augmented generation framework that structures retrieved documents into knowledge units like tables, graphs, and algorithms before reasoning, significantly improving answer quality over vanilla RAG."
+  },
+  {
+    "docId": "doc-1",
+    "fileName": "method.txt",
+    "text": "The StructRAG pipeline has five stages: Route (classify query intent), Construct (select the best structure type), Decompose (break query into sub-questions), Extract (retrieve evidence per sub-question), and Merge (synthesize the final answer)."
+  },
+  {
+    "docId": "doc-2",
+    "fileName": "benefits.txt",
+    "text": "By organizing raw text chunks into structured representations, StructRAG enables more precise reasoning over complex multi-hop questions that require combining information from multiple document sections."
+  },
+  {
+    "docId": "doc-2",
+    "fileName": "results.txt",
+    "text": "Experiments on multi-hop QA benchmarks show StructRAG achieves 15-25% accuracy improvement over standard RAG approaches, with the biggest gains on questions requiring cross-document reasoning."
+  },
+  {
+    "docId": "doc-3",
+    "fileName": "limitations.txt",
+    "text": "Current limitations of StructRAG include higher latency due to multiple LLM calls in the pipeline, increased token usage from structure construction, and dependency on LLM quality for accurate structure extraction."
+  }
+]

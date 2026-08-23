@@ -58,6 +58,30 @@ internal sealed class DecomposeExecutorTests
         Assert.That(result!.SubQueries, Is.EqualTo(new[] { "the only question" }));
     }
 
+    [Test]
+    public async Task FiltersDegenerateLinesWithoutLetters()
+    {
+        var client = new StageAwareFakeChatClient(_ => "{\nHow does Y work?\n}");
+        var executor = new DecomposeExecutor(client, NullLogger<DecomposeExecutor>.Instance);
+
+        var workflow = new WorkflowBuilder(executor).Build(validateOrphans: false);
+        var input = new StructuredKnowledge
+        {
+            Instruction = "fallback",
+            Info = "kb",
+            Query = "q",
+            StructureType = StructureType.Chunk,
+            RecordCount = 1,
+            Config = new StructRAGConfig()
+        };
+
+        var run = await InProcessExecution.RunAsync(workflow, input);
+        var result = FindOutput<SubQueryList>(run);
+
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.SubQueries, Is.EqualTo(new[] { "How does Y work?" }));
+    }
+
     static T? FindOutput<T>(Run run) where T : class
     {
         T? last = null;

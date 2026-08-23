@@ -77,6 +77,10 @@ public sealed class StructRAGClient
         var answer = FindOutput<StructRAGAnswer>(run);
         if (answer is null)
         {
+            var failure = run.NewEvents.OfType<ExecutorFailedEvent>().FirstOrDefault();
+            if (failure?.Data is Exception pipelineError)
+                throw new InvalidOperationException($"StructRAG pipeline failed to produce an answer for query: {question}", pipelineError);
+
             logger.LogWarning("Workflow returned no output for query: {Question}", question);
             return new StructRAGAnswer
             {

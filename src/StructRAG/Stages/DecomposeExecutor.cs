@@ -37,7 +37,7 @@ internal sealed class DecomposeExecutor : Executor
         var subQueries = response
             .Split('\n')
             .Select(q => q.Trim())
-            .Where(q => q.Length > 0)
+            .Where(q => q.Length > 0 && q.Any(char.IsLetter))
             .ToList();
 
         if (subQueries.Count == 0)
