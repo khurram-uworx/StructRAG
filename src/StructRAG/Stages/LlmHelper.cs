@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Polly;
@@ -55,5 +56,70 @@ internal static class LlmHelper
         }).ConfigureAwait(false);
 
         return result;
+    }
+
+    /// <summary>
+    /// Requests a strongly-typed JSON response via MEAI structured output, with the same
+    /// retry/timeout envelope as <see cref="GetCompletionAsync"/>. If the model cannot honor the
+    /// JSON schema (common with local Ollama models), it falls back to a plain-text call and
+    /// deserializes the returned JSON, so callers get a <typeparamref name="T"/> either way.
+    /// </summary>
+    public static async Task<T> GetStructuredAsync<T>(
+        IChatClient chatClient,
+        string prompt,
+        StructRAGConfig config,
+        ILogger? logger = null,
+        CancellationToken cancellationToken = default) where T : class
+    {
+        if (chatClient is null)
+            throw new ArgumentNullException(nameof(chatClient));
+
+        var messages = new List<ChatMessage> { new(ChatRole.User, prompt) };
+        var options = new ChatOptions
+        {
+            Temperature = config.Temperature,
+            MaxOutputTokens = config.MaxOutputTokens
+        };
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(config.TimeoutSeconds));
+
+        var retryPolicy = Policy
+            .Handle<Exception>()
+            .WaitAndRetryAsync(
+                config.MaxRetries,
+                retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+                onRetry: (exception, delay, attempt, _) =>
+                {
+                    logger?.LogWarning(
+                        "Structured LLM attempt {Attempt} failed ({Reason}), retrying in {Delay}s",
+                        attempt,
+                        exception?.Message ?? "empty result",
+                        delay.TotalSeconds);
+                });
+
+        try
+        {
+            return await retryPolicy.ExecuteAsync(async () =>
+            {
+                var response = await chatClient
+                    .GetResponseAsync<T>(messages, options, cancellationToken: timeout.Token)
+                    .ConfigureAwait(false);
+                return response.Result ?? throw new InvalidOperationException("Empty structured result");
+            }).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "Structured output failed; falling back to text JSON parse");
+
+            var text = await retryPolicy.ExecuteAsync(async () =>
+            {
+                var response = await chatClient.GetResponseAsync(messages, options, timeout.Token).ConfigureAwait(false);
+                return response.Text ?? throw new InvalidOperationException("Empty response");
+            }).ConfigureAwait(false);
+
+            return JsonSerializer.Deserialize<T>(text, AIJsonUtilities.DefaultOptions)
+                ?? throw new InvalidOperationException($"Failed to parse JSON into {typeof(T).Name}");
+        }
     }
 }
