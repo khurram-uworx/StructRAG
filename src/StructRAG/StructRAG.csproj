@@ -39,7 +39,7 @@
     <!-- Relational substrate store (EF Core) — pure EF providers only.
          DO NOT add Microsoft.SemanticKernel.Connectors.PgVector / .SqlServer:
          those pull Npgsql 8.x (ReloadTypesAsync removed in Npgsql 10.x) -> runtime
-         MissingMethodException. See docs/IMPLEMENTATION.md "Known pitfalls". -->
+         MissingMethodException. See ARCHITECTURE.md (Knowledge Substrate) for the design and this pitfall. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.11" />
