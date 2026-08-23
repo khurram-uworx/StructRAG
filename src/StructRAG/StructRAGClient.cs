@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.VectorData;
 using StructRAG.Models;
 using StructRAG.Pipeline;
+using StructRAG.Store;
 using StructRAG.Stages;
 
 namespace StructRAG;
@@ -27,14 +28,15 @@ public sealed class StructRAGClient
         IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
         VectorStoreCollection<string, StructRAGRecord> collection,
         ILoggerFactory? loggerFactory = null,
-        StructRAGConfig? config = null)
+        StructRAGConfig? config = null,
+        IRelationalStore? store = null)
     {
         this.chatClient = chatClient;
         this.embeddingGenerator = embeddingGenerator;
         this.collection = collection;
         this.config = config ?? new StructRAGConfig();
         this.logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<StructRAGClient>();
-        this.workflow = StructRAGPipeline.Build(chatClient, loggerFactory ?? NullLoggerFactory.Instance);
+        this.workflow = StructRAGPipeline.Build(chatClient, loggerFactory ?? NullLoggerFactory.Instance, store);
     }
 
     /// <summary>

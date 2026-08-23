@@ -139,12 +139,22 @@ builder.Services.AddStructRAG(options =>
     };
 });
 
+// Optional relational substrate: persists extracted knowledge so repeated queries
+// skip the LLM construct step. SQLite file keeps the substrate across runs.
+builder.Services.AddStructRAGRelationalStore("sqlite", "Data Source=structrag.db");
+
 using var host = builder.Build();
 var client = host.Services.GetRequiredService<StructRAGClient>();
 
 var sw = Stopwatch.StartNew();
 var answer = await client.AskAsync(question);
 sw.Stop();
+
+// Second pass: if the substrate was built, this reuses it (no LLM construct).
+var sw2 = Stopwatch.StartNew();
+var answer2 = await client.AskAsync(question);
+sw2.Stop();
+Console.Error.WriteLine($"Second pass elapsed: {(long)sw2.Elapsed.TotalMilliseconds} ms");
 
 // ---------- Result (stdout is clean + parseable; diagnostics go to stderr) ----------
 Console.WriteLine($"MODEL: {chatModel}");

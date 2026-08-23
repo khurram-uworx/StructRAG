@@ -14,6 +14,7 @@ public sealed class StructRAGConfig
     int maxParallelSubQueries = 4;
     int maxRetries = 3;
     int timeoutSeconds = 60;
+    string extractionVersion = "1.0";
 
     /// <summary>Minimum relevance score for vector search results. Must be in [0, 1].</summary>
     public double MinRelevance
@@ -109,5 +110,13 @@ public sealed class StructRAGConfig
                 throw new ArgumentOutOfRangeException(nameof(value), value, "TimeoutSeconds must be greater than zero.");
             timeoutSeconds = value;
         }
+    }
+
+    /// <summary>Version marker for the substrate extraction. Bump this when the prompt or model
+    /// changes so previously-built documents are detected as stale and lazily rebuilt.</summary>
+    public string ExtractionVersion
+    {
+        get => extractionVersion;
+        set => extractionVersion = value ?? throw new ArgumentNullException(nameof(value));
     }
 }

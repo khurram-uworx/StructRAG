@@ -13,6 +13,8 @@ This is the StructRAG project — a .NET 10 library that enhances RAG by structu
 - **Executors** (`Workflow/*.cs`, namespace `StructRAG.Stages`): Each stage is an `Executor` subclass. Override `ConfigureProtocol(ProtocolBuilder)` — **not** `ConfigureRoutes`. The method on `ProtocolBuilder` is `ConfigureRoutes`; the override on `Executor` is `ConfigureProtocol`.
 - **Prompts** (`Prompts/StructRAG/*.txt`): Embedded resources loaded via `PromptLoader`. Variable syntax: `{{$variable}}`. Copy prompts verbatim — do not edit unless modifying the original prompt.
 - **Message types** (`Workflow/Messages.cs`): Typed messages chain stages together. Add new fields to the message type, not as side channels.
+- **Knowledge substrate** (`Store/`, `Ingestion/`, `Models/Substrate/`, `Stages/SubstrateViewBuilder.cs`): Opt-in EF Core persistence behind `IRelationalStore`. `ConstructExecutor` is coverage-aware — with a store and full chunk coverage at `StructRAGConfig.ExtractionVersion` it serves a deterministic view with no LLM call; otherwise `LazyKnowledgeBuilder` extracts and persists. Adding a new `StructureType` must extend the substrate model, `KnowledgeExtraction`, `LazyKnowledgeBuilder`, and `SubstrateViewBuilder` together.
+- **EF Core migrations:** `StructRAGDbContext` uses a single fixed `structrag` schema and a design-time factory (`StructRAGDbContextFactory`) for `dotnet ef migrations`. After changing substrate entities, regenerate the migration; keep it provider-agnostic (use the operations API, no native jsonb/pg-specific calls).
 
 ## Code Style
 
@@ -48,7 +50,7 @@ This is the StructRAG project — a .NET 10 library that enhances RAG by structu
 
 ## GitHub CLI & Shell
 
-- **Write PR/issue bodies to a file** — for `gh pr create` / `gh issue create`, pass the body with `--body-file <path>` rather than inline `--body`. Multi-line strings with quotes and newlines are error-prone in PowerShell (pwsh): the shell's quoting interacts badly with `gh`, and inline bodies frequently get mangled or rejected. Write the body with the `write` tool to a temp path (e.g. the approved temp dir), then reference it.
+- **Always write PR/issue bodies to a file — never inline.** For `gh pr create` / `gh issue create`, write the body to a temp file with the `write` tool (e.g. the approved temp dir), then pass it with `--body-file <path>`. Never use inline `--body "..."`. Multi-line bodies with quotes and newlines are error-prone in PowerShell (pwsh): the shell's quoting interacts badly with `gh`, and inline bodies frequently get mangled or rejected. PR titles may stay inline, but the body must come from a file.
 - **Quote git ref expressions with `@{}`** — pwsh parses `@{u}` as a hashtable literal and breaks git commands. Always single-quote it: `git rev-parse --abbrev-ref --symbolic-full-name '@{u}'`.
 
 ## Build & Verify
